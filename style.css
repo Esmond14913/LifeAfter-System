@@ -146,6 +146,14 @@ body.dark-theme {
     border-top: 1px solid var(--border-color);
 }
 
+.version-info {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+    font-family: 'Courier New', Courier, monospace;
+    letter-spacing: 1px;
+}
+
 .author-info {
     display: flex;
     flex-direction: column;

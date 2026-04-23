@@ -51,6 +51,7 @@
             </nav>
 
             <div class="sidebar-footer">
+                <div class="version-info">v1.1.0</div>
                 <div class="author-info">
                     <span class="author-label">系統設計</span>
                     <span class="author-name">夜雨</span>
@@ -111,14 +112,36 @@
                             <option value="體力">體力</option>
                         </select>
                     </div>
-                    <button id="backup-csv" class="action-btn secondary">
-                        <i class="fas fa-file-export"></i> 備份 CSV
-                    </button>
-                    <button id="import-csv-btn" class="action-btn">
-                        <i class="fas fa-file-import"></i> 匯入 CSV
-                    </button>
+                    <div class="admin-actions">
+                        <button id="admin-login-btn" class="action-btn secondary">
+                            <i class="fas fa-user-shield"></i> 管理員登入
+                        </button>
+                        <div id="admin-tools" style="display: none;">
+                            <button id="add-recipe-btn" class="action-btn">
+                                <i class="fas fa-plus"></i> 新增食譜
+                            </button>
+                            <button id="backup-csv" class="action-btn secondary">
+                                <i class="fas fa-file-export"></i> 備份 CSV
+                            </button>
+                            <button id="import-csv-btn" class="action-btn secondary">
+                                <i class="fas fa-file-import"></i> 匯入 CSV
+                            </button>
+                            <button id="clear-db-btn" class="action-btn danger">
+                                <i class="fas fa-trash-alt"></i> 一鍵清空
+                            </button>
+                        </div>
+                    </div>
                     <input type="file" id="csv-file-input" style="display: none;" accept=".csv">
                 </div>
+            </div>
+
+            <!-- Proficiency Dashboard -->
+            <div id="prof-dashboard" class="prof-dashboard animate-fade-in" style="display: none;">
+                <div class="dash-item insight"><span class="count">0</span><label>領悟</label></div>
+                <div class="dash-item unfamiliar"><span class="count">0</span><label>生疏</label></div>
+                <div class="dash-item proficient"><span class="count">0</span><label>熟練</label></div>
+                <div class="dash-item master"><span class="count">0</span><label>掌握</label></div>
+                <div class="dash-summary">剩餘未滿：<span id="remaining-count">0</span></div>
             </div>
 
             <div class="recipe-stats">
@@ -133,6 +156,67 @@
             </div>
 
             <div id="loading-trigger" style="height: 20px; margin-bottom: 50px;"></div>
+        </div>
+
+        <!-- Modals -->
+        <div id="modal-overlay" class="modal-overlay">
+            <!-- Password Modal -->
+            <div id="auth-modal" class="modal-content animate-fade-in">
+                <h3>管理員認證</h3>
+                <input type="password" id="admin-password" placeholder="請輸入密碼">
+                <div class="modal-actions">
+                    <button id="auth-cancel" class="modal-btn">取消</button>
+                    <button id="auth-confirm" class="modal-btn primary">確定</button>
+                </div>
+            </div>
+
+            <!-- Edit/Add Modal -->
+            <div id="recipe-modal" class="modal-content wide animate-fade-in">
+                <h3 id="modal-title">編輯食譜</h3>
+                <form id="recipe-form">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>料理名稱</label>
+                            <input type="text" name="料理名稱" required>
+                        </div>
+                        <div class="form-group">
+                            <label>熟練度</label>
+                            <select name="熟練度" id="prof-select">
+                                <option value="領悟">領悟</option>
+                                <option value="生疏">生疏</option>
+                                <option value="熟練">熟練</option>
+                                <option value="掌握">掌握</option>
+                                <option value="無">無</option>
+                            </select>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>食材清單 (以、分隔)</label>
+                            <input type="text" name="食材清單">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>屬性加成 (以、分隔)</label>
+                            <input type="text" name="屬性加成">
+                        </div>
+                        <div class="form-group">
+                            <label>備註</label>
+                            <input type="text" name="備註">
+                        </div>
+                        <div class="form-group">
+                            <label>編號</label>
+                            <input type="text" name="編號">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>圖片資料 (Base64)</label>
+                            <textarea name="圖片數據" rows="3"></textarea>
+                            <input type="file" id="image-upload-input" accept="image/*" style="margin-top:5px; font-size: 0.8rem;">
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" id="modal-cancel" class="modal-btn">取消</button>
+                        <button type="submit" class="modal-btn primary">儲存</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </script>
 
