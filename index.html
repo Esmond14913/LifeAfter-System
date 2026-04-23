@@ -51,7 +51,7 @@
             </nav>
 
             <div class="sidebar-footer">
-                <div class="version-info">v1.1.0</div>
+                <div class="version-info">v1.2.0</div>
                 <div class="author-info">
                     <span class="author-label">系統設計</span>
                     <span class="author-name">夜雨</span>
@@ -216,6 +216,67 @@
                         <button type="submit" class="modal-btn primary">儲存</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    <!-- Trading Market Template -->
+    <script type="text/template" id="market-template">
+        <div class="market-module animate-fade-in">
+            <div class="module-header">
+                <div class="search-container">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="market-search" placeholder="搜尋品項名稱或類別...">
+                </div>
+                <div class="filter-controls">
+                    <div class="filter-group">
+                        <label>類別</label>
+                        <select id="market-category-filter">
+                            <option value="">全部</option>
+                            <option value="材料">材料</option>
+                            <option value="半成品">半成品</option>
+                        </select>
+                    </div>
+                    <div class="admin-actions">
+                        <button id="market-admin-login" class="action-btn secondary">
+                            <i class="fas fa-user-shield"></i> 管理員登入
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="market-table-container">
+                <table class="market-table">
+                    <thead>
+                        <tr>
+                            <th>品項</th>
+                            <th>類別</th>
+                            <th>系統低價</th>
+                            <th>系統高價 (3x)</th>
+                            <th>現在市價</th>
+                            <th>物價區間</th>
+                            <th>更新時間</th>
+                            <th class="admin-only" style="display:none;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="market-body">
+                        <!-- Market rows will be injected here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Price Edit Modal -->
+        <div id="market-modal-overlay" class="modal-overlay">
+            <div class="modal-content animate-fade-in">
+                <h3>更新市場價格</h3>
+                <div id="edit-item-name" style="font-weight: bold; margin-bottom: 10px; color: var(--accent-orange);">品項名稱</div>
+                <div class="form-group">
+                    <label>現在市場價格</label>
+                    <input type="number" id="new-market-price">
+                </div>
+                <div class="modal-actions">
+                    <button id="market-edit-cancel" class="modal-btn">取消</button>
+                    <button id="market-edit-confirm" class="modal-btn primary">更新價格</button>
+                </div>
             </div>
         </div>
     </script>
