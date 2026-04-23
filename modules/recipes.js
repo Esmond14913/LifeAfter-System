@@ -330,11 +330,21 @@
             const boostHtml = (recipe['屬性加成'] || '').split('、').filter(b => b)
                 .map(b => `<div class="boost-line">${b}</div>`).join('');
 
-            let base64Data = recipe['圖片數據'] || '';
-            const b64Match = base64Data.match(/[A-Za-z0-9+/]{20,}/);
-            if (b64Match) base64Data = b64Match[0];
+            let imgSrc = 'https://placehold.co/160x160/222/f39c12?text=食譜圖片';
+            const rawImageData = recipe['圖片數據'] || '';
 
-            const imgSrc = base64Data ? `data:image/jpeg;base64,${base64Data}` : 'https://placehold.co/160x160/222/f39c12?text=食譜圖片';
+            if (rawImageData.startsWith('http')) {
+                // Case 1: External URL
+                imgSrc = rawImageData;
+            } else if (rawImageData.match(/[A-Za-z0-9+/]{50,}/)) {
+                // Case 2: Base64 Data
+                const b64Match = rawImageData.match(/[A-Za-z0-9+/]{20,}/);
+                const cleanB64 = b64Match ? b64Match[0] : '';
+                imgSrc = cleanB64 ? `data:image/jpeg;base64,${cleanB64}` : imgSrc;
+            } else if (rawImageData.trim() !== '') {
+                // Case 3: Filename (assumed to be in images/ folder)
+                imgSrc = `images/${rawImageData.trim()}`;
+            }
 
             const prof = recipe['熟練度'] || '無';
             const profClass = { '領悟': 'insight', '生疏': 'unfamiliar', '熟練': 'proficient', '掌握': 'master', '無': 'none' }[prof];
