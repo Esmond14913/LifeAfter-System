@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>明日之後生存系統 - 夜雨</title>
+    <meta name="description" content="明日之後全方位生存助手，包含食譜、市場價格、製作成本及各式小工具。">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fas fa-biohazard"></i>
+                    <span class="logo-text">明日助手</span>
+                </div>
+                <button id="sidebar-toggle-btn" class="toggle-btn" aria-label="切換選單">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="nav-item active" data-target="dashboard">
+                        <i class="fas fa-home"></i>
+                        <span class="nav-text">總覽</span>
+                    </li>
+                    <li class="nav-item" data-target="recipes">
+                        <i class="fas fa-utensils"></i>
+                        <span class="nav-text">食譜庫</span>
+                    </li>
+                    <li class="nav-item" data-target="market">
+                        <i class="fas fa-chart-line"></i>
+                        <span class="nav-text">交易市場</span>
+                    </li>
+                    <li class="nav-item" data-target="costs">
+                        <i class="fas fa-hammer"></i>
+                        <span class="nav-text">製作成本</span>
+                    </li>
+                    <li class="nav-item" data-target="tools">
+                        <i class="fas fa-tools"></i>
+                        <span class="nav-text">小工具</span>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="author-info">
+                    <span class="author-label">系統設計</span>
+                    <span class="author-name">夜雨</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="content-header">
+                <h1 id="page-title">系統總覽</h1>
+                <div class="header-actions">
+                    <span id="current-time">00:00:00</span>
+                </div>
+            </header>
+
+            <section id="content-area" class="content-area">
+                <!-- Content will be dynamically loaded here -->
+                <div class="welcome-card animate-fade-in">
+                    <h2>歡迎使用明日助手</h2>
+                    <p>這是一個專為《明日之後》玩家設計的綜合系統。請從左側選單選擇功能。</p>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-value">---</span>
+                            <span class="stat-label">今日推薦食譜</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">---</span>
+                            <span class="stat-label">市場波動指數</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">---</span>
+                            <span class="stat-label">最近更新</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Module Templates (To bypass CORS on local file protocol) -->
+    <script type="text/template" id="recipes-template">
+        <div class="recipes-module animate-fade-in">
+            <div class="module-header">
+                <div class="search-container">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="recipe-search" placeholder="搜尋料理名稱、食材或屬性...">
+                </div>
+                <div class="filter-controls">
+                    <div class="filter-group">
+                        <label>快速篩選</label>
+                        <select id="attr-filter">
+                            <option value="">全部屬性</option>
+                            <option value="移動速度">移動速度</option>
+                            <option value="暴擊率">暴擊率</option>
+                            <option value="採集">採集</option>
+                            <option value="戰鬥">戰鬥</option>
+                            <option value="體力">體力</option>
+                        </select>
+                    </div>
+                    <button id="backup-csv" class="action-btn secondary">
+                        <i class="fas fa-file-export"></i> 備份 CSV
+                    </button>
+                    <button id="import-csv-btn" class="action-btn">
+                        <i class="fas fa-file-import"></i> 匯入 CSV
+                    </button>
+                    <input type="file" id="csv-file-input" style="display: none;" accept=".csv">
+                </div>
+            </div>
+
+            <div class="recipe-stats">
+                <span id="result-count">找到 0 筆食譜</span>
+                <div class="view-mode">
+                    <i class="fas fa-list"></i> 捲動瀏覽模式
+                </div>
+            </div>
+
+            <div class="recipe-grid" id="recipe-grid">
+                <!-- Recipe cards will be injected here -->
+            </div>
+
+            <div id="loading-trigger" style="height: 20px; margin-bottom: 50px;"></div>
+        </div>
+    </script>
+
+    <script src="script.js"></script>
+</body>
+</html>
