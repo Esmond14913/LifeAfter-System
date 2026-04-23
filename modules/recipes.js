@@ -6,31 +6,40 @@
     let isAdmin = false;
     let currentEditId = null;
 
-    const elements = {
-        search: document.getElementById('recipe-search'),
-        attrFilter: document.getElementById('attr-filter'),
-        grid: document.getElementById('recipe-grid'),
-        resultCount: document.getElementById('result-count'),
-        backupBtn: document.getElementById('backup-csv'),
-        importBtn: document.getElementById('import-csv-btn'),
-        fileInput: document.getElementById('csv-file-input'),
-        loadingTrigger: document.getElementById('loading-trigger'),
-        
-        // Admin Elements
-        adminLoginBtn: document.getElementById('admin-login-btn'),
-        adminTools: document.getElementById('admin-tools'),
-        addRecipeBtn: document.getElementById('add-recipe-btn'),
-        clearDbBtn: document.getElementById('clear-db-btn'),
-        profDashboard: document.getElementById('prof-dashboard'),
-        
-        // Modals
-        overlay: document.getElementById('modal-overlay'),
-        authModal: document.getElementById('auth-modal'),
-        recipeModal: document.getElementById('recipe-modal'),
-        passwordInput: document.getElementById('admin-password'),
-        recipeForm: document.getElementById('recipe-form'),
-        modalTitle: document.getElementById('modal-title'),
-        imageInput: document.getElementById('image-upload-input')
+    let elements = {};
+
+    // This function will be called by script.js when the module is loaded
+    window.initializeRecipes = function() {
+        elements = {
+            search: document.getElementById('recipe-search'),
+            attrFilter: document.getElementById('attr-filter'),
+            grid: document.getElementById('recipe-grid'),
+            resultCount: document.getElementById('result-count'),
+            backupBtn: document.getElementById('backup-csv'),
+            importBtn: document.getElementById('import-csv-btn'),
+            fileInput: document.getElementById('csv-file-input'),
+            loadingTrigger: document.getElementById('loading-trigger'),
+            
+            // Admin Elements
+            adminLoginBtn: document.getElementById('admin-login-btn'),
+            adminTools: document.getElementById('admin-tools'),
+            addRecipeBtn: document.getElementById('add-recipe-btn'),
+            clearDbBtn: document.getElementById('clear-db-btn'),
+            profDashboard: document.getElementById('prof-dashboard'),
+            
+            // Modals
+            overlay: document.getElementById('modal-overlay'),
+            authModal: document.getElementById('auth-modal'),
+            recipeModal: document.getElementById('recipe-modal'),
+            passwordInput: document.getElementById('admin-password'),
+            recipeForm: document.getElementById('recipe-form'),
+            modalTitle: document.getElementById('modal-title'),
+            imageInput: document.getElementById('image-upload-input')
+        };
+
+        if (elements.adminLoginBtn) {
+            init();
+        }
     };
 
     // Initialize Module
@@ -384,5 +393,5 @@
         link.click();
     }
 
-    init();
+    // init(); // Removed, now called by window.initializeRecipes
 })();

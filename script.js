@@ -144,11 +144,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Load JS
+        const scriptId = `${moduleName}-script`;
+        const oldScript = document.getElementById(scriptId);
+        if (oldScript) oldScript.remove();
+
         const script = document.createElement('script');
         script.src = `modules/${moduleName}.js`;
-        script.id = `${moduleName}-script`;
-        const oldScript = document.getElementById(`${moduleName}-script`);
-        if (oldScript) oldScript.remove();
+        script.id = scriptId;
+        
+        // When the script is loaded, call its initialization function
+        script.onload = () => {
+            const initFuncName = `initialize${moduleName.charAt(0).toUpperCase() + moduleName.slice(1)}`;
+            if (typeof window[initFuncName] === 'function') {
+                console.log(`Initializing module: ${moduleName}`);
+                window[initFuncName]();
+            }
+        };
+        
         document.body.appendChild(script);
     }
 
