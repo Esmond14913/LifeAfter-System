@@ -4,6 +4,7 @@
     let dirHandle = null;
     let currentEditingItem = null;
     let elements = {};
+    let currentWorkbook = null;
 
     const DB_NAME = 'LifeAfter_Market_FS';
     const STORE_NAME = 'handles';
@@ -107,33 +108,19 @@
         
         try {
             if (!(await verifyPermission(dirHandle))) {
-                elements.statusMsg.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#e74c3c"></i> 權限不足，請點擊連接授權';
+                elements.statusMsg.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#e74c3c"></i> 權限不足，請重新點擊連接授權';
                 return;
             }
 
             let foundFile = null;
-            let isMigration = false;
-
             try {
-                // Try to load XLSX first
                 const fileHandle = await dirHandle.getFileHandle(MASTER_FILE_XLSX);
                 foundFile = await fileHandle.getFile();
             } catch (e) {
-                // If XLSX not found, try old CSV
                 try {
                     const csvHandle = await dirHandle.getFileHandle(MASTER_FILE_CSV);
                     foundFile = await csvHandle.getFile();
-                    isMigration = true;
-                } catch (e2) {
-                    // Finally, try any CSV in the folder (backup or other)
-                    for await (const entry of dirHandle.values()) {
-                        if (entry.kind === 'file' && entry.name.endsWith('.csv')) {
-                            foundFile = await entry.getFile();
-                            isMigration = true;
-                            break;
-                        }
-                    }
-                }
+                } catch (e2) { }
             }
 
             if (!foundFile) {
@@ -143,18 +130,15 @@
 
             if (foundFile.name.endsWith('.xlsx')) {
                 const buffer = await foundFile.arrayBuffer();
-                const workbook = XLSX.read(buffer, { type: 'array' });
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                currentWorkbook = XLSX.read(buffer, { type: 'array' });
+                const sheet = currentWorkbook.Sheets["MarketData"] || currentWorkbook.Sheets[currentWorkbook.SheetNames[0]];
                 marketData = XLSX.utils.sheet_to_json(sheet);
             } else {
                 const text = await foundFile.text();
                 marketData = parseCSV(text);
-                if (isMigration) {
-                    await saveToFolder(true); // Auto-convert to XLSX
-                }
+                await saveToFolder(true); 
             }
 
-            // Standardize column names if needed
             marketData = marketData.map(row => ({
                 '母類別': row['母類別'] || '',
                 '子類別': row['子類別'] || '',
@@ -213,9 +197,21 @@
         if (!quiet) elements.statusMsg.innerHTML = '<i class="fas fa-save fa-spin"></i> 正在更新 Excel 檔案...';
 
         try {
-            const worksheet = XLSX.utils.json_to_sheet(marketData);
+            const marketSheet = XLSX.utils.json_to_sheet(marketData);
             const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "MarketData");
+            
+            // Add MarketData Sheet
+            XLSX.utils.book_append_sheet(workbook, marketSheet, "MarketData");
+            
+            // PRESERVE other sheets (like CraftingRecipes) if we have them in memory
+            if (currentWorkbook) {
+                currentWorkbook.SheetNames.forEach(name => {
+                    if (name !== "MarketData" && name !== workbook.SheetNames[0]) {
+                        XLSX.utils.book_append_sheet(workbook, currentWorkbook.Sheets[name], name);
+                    }
+                });
+            }
+
             const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
 
             // 1. Save Master XLSX
@@ -232,6 +228,9 @@
             const backupWritable = await backupHandle.createWritable();
             await backupWritable.write(buffer);
             await backupWritable.close();
+
+            // Update memory reference
+            currentWorkbook = workbook;
 
             if (!quiet) elements.statusMsg.innerHTML = `<i class="fas fa-check-circle" style="color:#2ecc71"></i> 存檔與備份成功！`;
         } catch (e) {
