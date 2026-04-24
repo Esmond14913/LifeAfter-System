@@ -157,9 +157,10 @@
 
             <div id="loading-trigger" style="height: 20px; margin-bottom: 50px;"></div>
         </div>
+    </script>
 
-        <!-- Modals -->
-        <div id="modal-overlay" class="modal-overlay">
+    <!-- Modals -->
+    <div id="modal-overlay" class="modal-overlay">
             <!-- Password Modal -->
             <div id="auth-modal" class="modal-content animate-fade-in">
                 <h3>管理員認證</h3>
@@ -219,25 +220,194 @@
             </div>
         </div>
     <!-- Trading Market Template -->
+    <!-- Trading Market Template -->
     <script type="text/template" id="market-template">
+        <style>
+            .market-module { padding: 20px; color: #fff; display: flex; flex-direction: column; height: 85vh; }
+            
+            .module-header { 
+                background: #111; 
+                padding: 15px 0; 
+                z-index: 1000; 
+                display: flex; 
+                justify-content: space-between; 
+                align-items: flex-end; 
+                margin-bottom: 0;
+                gap: 20px; 
+                flex-wrap: wrap;
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+                flex-shrink: 0;
+            }
+
+            .header-right { display: flex; align-items: flex-end !important; gap: 15px; }
+            .filter-group { display: flex; flex-direction: column; gap: 8px; }
+            .filter-group label { font-size: 0.8rem; color: #888; font-weight: 600; margin-left: 2px; }
+            .filter-group select { 
+                background: rgba(255,255,255,0.05); 
+                border: 1px solid rgba(255,255,255,0.1); 
+                padding: 10px 15px; 
+                border-radius: 10px; 
+                color: #fff; 
+                outline: none;
+                cursor: pointer;
+                height: 42px !important;
+                box-sizing: border-box !important;
+            }
+
+            /* Premium Button Styles */
+            .folder-controls { display: flex; gap: 12px; align-items: flex-end !important; }
+            
+            .admin-btn {
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                color: #ddd;
+                padding: 10px 18px;
+                border-radius: 10px;
+                font-size: 0.9rem;
+                font-weight: 600;
+                cursor: pointer;
+                height: 42px !important; /* Unified height */
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                backdrop-filter: blur(10px);
+                box-sizing: border-box !important;
+            }
+
+            .admin-btn:hover {
+                background: rgba(255, 255, 255, 0.12);
+                border-color: rgba(255, 255, 255, 0.2);
+                color: #fff;
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            }
+
+            .admin-btn i { font-size: 1rem; opacity: 0.8; }
+
+            /* Specific Sync Button (Accent) */
+            #market-sync-data {
+                background: linear-gradient(135deg, #f39c12, #d35400);
+                border: none;
+                color: #fff;
+                box-shadow: 0 4px 15px rgba(243, 156, 18, 0.3);
+            }
+
+            #market-sync-data:hover {
+                background: linear-gradient(135deg, #f1c40f, #e67e22);
+                box-shadow: 0 6px 20px rgba(243, 156, 18, 0.4);
+                transform: translateY(-2px) scale(1.02);
+            }
+
+            /* Status Message Styling */
+            #market-status-msg {
+                padding: 15px;
+                font-size: 0.85rem;
+                color: #aaa;
+                text-align: center;
+                background: rgba(0,0,0,0.3);
+                border-radius: 0 0 12px 12px;
+                border-top: 1px solid rgba(255,255,255,0.05);
+                margin-top: 2px;
+                font-family: 'Inter', sans-serif;
+                letter-spacing: 0.5px;
+            }
+
+            .market-table-container { 
+                flex: 1;
+                overflow-y: auto;
+                background: rgba(20,20,20,0.6); 
+                border-radius: 12px; 
+                margin-top: 15px;
+                position: relative;
+            }
+
+            .market-table { 
+                width: 100%; 
+                border-collapse: separate; 
+                border-spacing: 0;
+            }
+            
+            .market-table th, .market-table td { padding: 15px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.05); }
+            
+            /* Fixed Sticky Header in Scroll Container */
+            .market-table th { 
+                position: sticky; 
+                top: 0; 
+                background: #1a1a1a; 
+                color: #888; 
+                font-size: 0.8rem; 
+                letter-spacing: 1px; 
+                z-index: 10;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.3); 
+            }
+
+            .price-tag { color: var(--accent-orange); font-weight: bold; font-family: 'Roboto Mono', monospace; }
+            .status-badge { padding: 5px 12px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; display: inline-block; margin-bottom: 5px; }
+            .status-cheap { background: rgba(46, 204, 113, 0.15); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.3); }
+            .status-fair { background: rgba(243, 156, 18, 0.15); color: #f39c12; border: 1px solid rgba(243, 156, 18, 0.3); }
+            .status-expensive { background: rgba(231, 76, 60, 0.15); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.3); }
+            
+            .admin-mini-btn { width: 32px; height: 32px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; cursor: pointer; color: #fff; transition: 0.3s; }
+            .admin-mini-btn:hover { background: var(--accent-orange); color: #000; transform: translateY(-2px); }
+            .admin-mini-btn.delete:hover { background: #e74c3c; color: #fff; }
+
+            .header-left { display: flex; gap: 15px; align-items: flex-end; flex: 1; }
+            .header-right { display: flex; gap: 10px; align-items: center; }
+            
+            .search-container { position: relative; width: 250px; }
+            .search-container i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #666; }
+            .search-container input { width: 100%; padding: 10px 10px 10px 35px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; }
+            
+            .filter-group { display: flex; flex-direction: column; gap: 5px; }
+            .filter-group label { font-size: 0.75rem; color: #666; font-weight: bold; }
+            .filter-group select { padding: 9px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; min-width: 140px; cursor: pointer; }
+
+            .admin-actions { display: flex; gap: 10px; align-items: center; }
+            
+            .action-btn { padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 500; transition: 0.3s; background: #333; color: #fff; }
+            .action-btn.primary { background: var(--accent-orange); color: #000; }
+            .action-btn.secondary { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); }
+            .action-btn.danger { background: rgba(231, 76, 60, 0.2); color: #ff7675; border: 1px solid rgba(231, 76, 60, 0.3); }
+            .action-btn:hover { transform: translateY(-2px); filter: brightness(1.2); }
+
+            .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); backdrop-filter: blur(8px); display:none; justify-content:center; align-items:center; z-index:9999; }
+            .modal-content { background: #1a1a1a; padding: 35px; border-radius: 16px; width: 450px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 25px 50px rgba(0,0,0,0.5); }
+            .modal-content h3 { margin-bottom: 25px; color: var(--accent-orange); font-size: 1.4rem; border-left: 4px solid var(--accent-orange); padding-left: 15px; }
+            .form-group { margin-bottom: 18px; }
+            .form-group label { display: block; margin-bottom: 8px; color: #888; font-size: 0.85rem; }
+            .form-group input, .form-group select { width: 100%; padding: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; transition: 0.3s; }
+            .form-group input:focus { border-color: var(--accent-orange); outline: none; background: rgba(255,255,255,0.08); }
+            .modal-footer { display: flex; justify-content: flex-end; gap: 12px; margin-top: 30px; }
+        </style>
         <div class="market-module animate-fade-in">
             <div class="module-header">
-                <div class="search-container">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="market-search" placeholder="搜尋品項名稱或類別...">
+                <div class="header-left">
+                    <div class="search-container">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="market-search" placeholder="搜尋品項名稱...">
+                    </div>
                 </div>
-                <div class="filter-controls">
+                
+                <div class="header-right">
                     <div class="filter-group">
-                        <label>類別</label>
+                        <label>母類別</label>
                         <select id="market-category-filter">
-                            <option value="">全部</option>
-                            <option value="材料">材料</option>
-                            <option value="半成品">半成品</option>
+                            <option value="">全部母類別</option>
                         </select>
                     </div>
-                    <div class="admin-actions">
-                        <button id="market-admin-login" class="action-btn secondary">
-                            <i class="fas fa-user-shield"></i> 管理員登入
+                    <div class="filter-group">
+                        <label>子類別</label>
+                        <select id="market-sub-category-filter">
+                            <option value="">全部子類別</option>
+                        </select>
+                    </div>
+                    <div class="folder-controls" style="display: flex; gap: 10px;">
+                        <button id="market-connect-folder" class="admin-btn">
+                            <i class="fas fa-folder-open"></i> 連接資料夾
+                        </button>
+                        <button id="market-sync-data" class="admin-btn" style="display:none; background: var(--accent-orange);">
+                            <i class="fas fa-sync-alt"></i> 同步數據
                         </button>
                     </div>
                 </div>
@@ -247,14 +417,16 @@
                 <table class="market-table">
                     <thead>
                         <tr>
+                            <th>母類別</th>
+                            <th>子類別</th>
+                            <th>地圖等級</th>
                             <th>品項</th>
-                            <th>類別</th>
                             <th>系統低價</th>
-                            <th>系統高價 (3x)</th>
+                            <th>系統高價</th>
                             <th>現在市價</th>
                             <th>物價區間</th>
                             <th>更新時間</th>
-                            <th class="admin-only" style="display:none;">操作</th>
+                            <th class="edit-col" style="display:none;">操作</th>
                         </tr>
                     </thead>
                     <tbody id="market-body">
@@ -262,25 +434,54 @@
                     </tbody>
                 </table>
             </div>
+            <div id="market-status-msg" style="padding: 15px; font-size: 0.9rem; color: #888; text-align: center; background: rgba(0,0,0,0.2); border-radius: 0 0 12px 12px; border-top: 1px solid rgba(255,255,255,0.05);">
+                <i class="fas fa-info-circle"></i> 備份系統：若有修正資料，將自動生成帶日期的備份檔。
+            </div>
         </div>
 
         <!-- Price Edit Modal -->
         <div id="market-modal-overlay" class="modal-overlay">
             <div class="modal-content animate-fade-in">
-                <h3>更新市場價格</h3>
-                <div id="edit-item-name" style="font-weight: bold; margin-bottom: 10px; color: var(--accent-orange);">品項名稱</div>
+                <h3 id="market-modal-title">更新市場價格</h3>
+                <div class="form-group">
+                    <label>母類別</label>
+                    <select id="market-main-cat">
+                        <option value="基礎資源">基礎資源</option>
+                        <option value="專屬資源">專屬資源</option>
+                        <option value="一般半成品">一般半成品</option>
+                        <option value="專屬半成品">專屬半成品</option>
+                        <option value="特殊材料">特殊材料</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>子類別 (如：木、石、一般)</label>
+                    <input type="text" id="market-sub-cat">
+                </div>
+                <div class="form-group">
+                    <label>地圖等級 (0-14)</label>
+                    <input type="number" id="market-level">
+                </div>
+                <div class="form-group">
+                    <label>品項名稱</label>
+                    <input type="text" id="market-item-name">
+                </div>
+                <div class="form-group">
+                    <label>系統低價</label>
+                    <input type="number" id="market-min-price">
+                </div>
                 <div class="form-group">
                     <label>現在市場價格</label>
-                    <input type="number" id="new-market-price">
+                    <input type="number" id="market-now-price">
                 </div>
-                <div class="modal-actions">
+                <div class="modal-actions" style="display:flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
                     <button id="market-edit-cancel" class="modal-btn">取消</button>
-                    <button id="market-edit-confirm" class="modal-btn primary">更新價格</button>
+                    <button id="market-edit-confirm" class="modal-btn primary">儲存並備份</button>
                 </div>
             </div>
         </div>
     </script>
 
+    <script src="market.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadModule(moduleName) {
         contentArea.innerHTML = '<div class="loading">載入中...</div>';
         
-        // Check for embedded template first (for local file protocol support)
+        // 1. Try embedded template (Primary)
         const template = document.getElementById(`${moduleName}-template`);
         if (template) {
             contentArea.innerHTML = template.innerHTML;
@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Fallback to fetch if template not found
+        // 2. Try Fetch (Fallback for recipes)
         if (moduleName === 'recipes') {
             try {
                 const htmlRes = await fetch('modules/recipes.html');
@@ -57,25 +57,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 contentArea.innerHTML = html;
                 initializeModuleAssets(moduleName);
                 return;
-            } catch (error) {
-                console.error('Module load failed:', error);
-                contentArea.innerHTML = `
-                    <div class="error-container">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <h3>模組載入失敗</h3>
-                        <p>偵測到您正以本地檔案模式開啟。請確保 templates 已正確嵌入 index.html。</p>
-                    </div>
-                `;
-                return;
-            }
+            } catch (e) { console.warn('Fetch failed, check templates'); }
         }
-        // ... (rest of the switch case)
 
+        // 3. Last Resort: Switch Case / Error
         const section = document.createElement('div');
         section.className = 'module-container animate-fade-in';
-        
         let content = '';
+
         switch(moduleName) {
+            case 'market':
+                // This shouldn't happen if template exists, but as a backup:
+                content = '<div class="error-container"><h3>請重新整理頁面</h3><p>交易市場模板未正確載入。</p></div>';
+                break;
             case 'dashboard':
                 content = `
                     <div class="welcome-card">
@@ -91,19 +85,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <span class="stat-label">市場波動指數</span>
                             </div>
                             <div class="stat-item">
-                                <span class="stat-value">2026-04-23</span>
-                                <span class="stat-label">最近更新</span>
+                                <span class="stat-value">v1.2.0</span>
+                                <span class="stat-label">當前版本</span>
                             </div>
                         </div>
-                    </div>
-                `;
-                break;
-            case 'market':
-                content = `
-                    <div class="module-placeholder">
-                        <i class="fas fa-chart-line"></i>
-                        <h3>交易市場</h3>
-                        <p>模組開發中... 未來將串接或手動紀錄各區物價波動。</p>
                     </div>
                 `;
                 break;
@@ -126,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
                 break;
             default:
-                content = '<h3>模組載入錯誤</h3>';
+                content = '<div class="error-container"><h3>模組路徑錯誤</h3><p>找不到指定的系統功能。</p></div>';
         }
         
         section.innerHTML = content;
@@ -134,7 +119,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initializeModuleAssets(moduleName) {
-        // Load CSS
+        const initFuncName = `initialize${moduleName.charAt(0).toUpperCase() + moduleName.slice(1)}`;
+        
+        // 1. If the function already exists (static load), call it immediately
+        if (typeof window[initFuncName] === 'function') {
+            console.log(`Module ${moduleName} already loaded, initializing directly.`);
+            window[initFuncName]();
+            return;
+        }
+
+        // 2. Load CSS
         if (!document.getElementById(`${moduleName}-css`)) {
             const link = document.createElement('link');
             link.id = `${moduleName}-css`;
@@ -143,20 +137,18 @@ document.addEventListener('DOMContentLoaded', () => {
             document.head.appendChild(link);
         }
         
-        // Load JS
+        // 3. Dynamic JS Loading (Fallback)
         const scriptId = `${moduleName}-script`;
         const oldScript = document.getElementById(scriptId);
         if (oldScript) oldScript.remove();
 
         const script = document.createElement('script');
-        script.src = `modules/${moduleName}.js`;
+        script.src = moduleName === 'market' ? `${moduleName}.js` : `modules/${moduleName}.js`;
         script.id = scriptId;
         
-        // When the script is loaded, call its initialization function
         script.onload = () => {
-            const initFuncName = `initialize${moduleName.charAt(0).toUpperCase() + moduleName.slice(1)}`;
             if (typeof window[initFuncName] === 'function') {
-                console.log(`Initializing module: ${moduleName}`);
+                console.log(`Dynamic load complete, initializing: ${moduleName}`);
                 window[initFuncName]();
             }
         };

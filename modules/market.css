@@ -95,3 +95,22 @@
 .admin-only-btn:hover {
     background: var(--accent-orange-hover);
 }
+
+.admin-mini-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-orange);
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.admin-mini-btn:hover { background: var(--accent-orange-hover); }
+.admin-mini-btn.delete { background: #e74c3c; color: #fff; }
+.admin-mini-btn.delete:hover { background: #c0392b; }
+
+/* Mobile Adjustments */
