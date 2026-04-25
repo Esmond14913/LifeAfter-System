@@ -5,8 +5,9 @@
     let dirHandle = null;
     let currentEditingBreed = null;
     let elements = {};
-    let currentWorkbook = null; // For potentially preserving other sheets if needed
 
+    const DATA_FOLDER = 'data';
+    const BACKUP_FOLDER = 'backups';
     const MASTER_FILE = 'Species_Master.csv';
     const ADMIN_PASSWORD = '1491';
 
@@ -82,26 +83,40 @@
         } catch (e) { }
     }
 
+    async function getDataFolder() {
+        if (!dirHandle) return null;
+        return await dirHandle.getDirectoryHandle(DATA_FOLDER, { create: true });
+    }
+
+    async function getBackupFolder() {
+        const dataFolder = await getDataFolder();
+        if (!dataFolder) return null;
+        return await dataFolder.getDirectoryHandle(BACKUP_FOLDER, { create: true });
+    }
+
     async function syncData() {
         if (!dirHandle) return;
         elements.statusMsg.innerHTML = '同步中...';
         try {
-            const fileHandle = await dirHandle.getFileHandle(MASTER_FILE, { create: true });
+            const dataFolder = await getDataFolder();
+            const fileHandle = await dataFolder.getFileHandle(MASTER_FILE, { create: true });
             const file = await fileHandle.getFile();
             let text = await file.text();
-            // Remove BOM if exists when reading
             if (text.startsWith('\ufeff')) text = text.slice(1);
             speciesData = parseCSV(text);
-            elements.statusMsg.innerHTML = '<i class="fas fa-check"></i> 資料已載入';
+            elements.statusMsg.innerHTML = '<i class="fas fa-check"></i> 資料已載入 (data/ 資料夾)';
             applyFilters();
-        } catch (e) { elements.statusMsg.innerHTML = '同步失敗'; }
+        } catch (e) { 
+            console.error(e);
+            elements.statusMsg.innerHTML = '讀取失敗'; 
+        }
     }
 
     function parseCSV(text) {
         const lines = text.trim().split(/\r?\n/);
         if (lines.length < 1) return [];
         const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-        if (headers.length < 2) return []; // Not a valid CSV or empty
+        if (headers.length < 2) return [];
         return lines.slice(1).map((line, idx) => {
             const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(',');
             const obj = { id: Date.now() + Math.random() + idx };
@@ -228,37 +243,34 @@
             speciesData.map(item => headers.map(h => `"${(item[h] || '').toString().replace(/"/g, '""')}"`).join(',')).join('\n');
         
         try {
-            // Use TextEncoder to create a Uint8Array with BOM
             const encoder = new TextEncoder();
             const contentArray = encoder.encode(csvContent);
-            const bomArray = new Uint8Array([0xEF, 0xBB, 0xBF]); // UTF-8 BOM
+            const bomArray = new Uint8Array([0xEF, 0xBB, 0xBF]);
             const finalArray = new Uint8Array(bomArray.length + contentArray.length);
             finalArray.set(bomArray);
             finalArray.set(contentArray, bomArray.length);
 
-            // Save Master
-            const masterHandle = await dirHandle.getFileHandle(MASTER_FILE, { create: true });
+            // Save to data/ folder
+            const dataFolder = await getDataFolder();
+            const masterHandle = await dataFolder.getFileHandle(MASTER_FILE, { create: true });
             const writable = await masterHandle.createWritable();
             await writable.write(finalArray);
             await writable.close();
 
-            // Backup
+            // Save to data/backups/ folder
+            const backupFolder = await getBackupFolder();
             const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
-            const backupHandle = await dirHandle.getFileHandle(`Species_Backup_${dateStr}.csv`, { create: true });
+            const backupHandle = await backupFolder.getFileHandle(`Species_Backup_${dateStr}.csv`, { create: true });
             const backupWritable = await backupHandle.createWritable();
             await backupWritable.write(finalArray);
             await backupWritable.close();
             
-            elements.statusMsg.innerHTML = '<i class="fas fa-save"></i> 存檔成功';
-        } catch (e) { alert("存檔失敗"); }
+            elements.statusMsg.innerHTML = '<i class="fas fa-save"></i> 存檔與備份成功 (data/)';
+        } catch (e) { 
+            console.error(e);
+            alert("存檔失敗"); 
+        }
     }
-
-    window.clearAllSpecies = async function() {
-        if (!confirm("確定要清空嗎？")) return;
-        speciesData = [];
-        await saveToCSV();
-        applyFilters();
-    };
 
     window.exportSpeciesCSV = function() {
         const headers = ['主物種', '次物種', '品種', '地圖等級', '地圖名稱', '備註'];
@@ -268,25 +280,5 @@
         link.href = URL.createObjectURL(blob);
         link.download = `Species_Notes.csv`;
         link.click();
-    };
-    
-    window.importSpeciesCSV = function() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.csv';
-        input.onchange = e => {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = async event => {
-                let text = event.target.result;
-                if (text.startsWith('\ufeff')) text = text.slice(1);
-                speciesData = parseCSV(text);
-                await saveToCSV();
-                applyFilters();
-                alert("匯入成功！");
-            };
-            reader.readAsText(file);
-        };
-        input.click();
     };
 })();
