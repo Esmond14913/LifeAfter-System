@@ -6,7 +6,6 @@
     let currentEditingBreed = null;
     let elements = {};
 
-    // Environment Detection
     const isOffline = window.location.protocol === 'file:' || 
                       window.location.hostname === 'localhost' || 
                       window.location.hostname === '127.0.0.1';
@@ -16,6 +15,12 @@
     const MASTER_FILE = 'Species_Master.csv';
     const ADMIN_PASSWORD = '1491';
     const ONLINE_URL = 'https://raw.githubusercontent.com/Esmond14913/LifeAfter-System/main/data/Species_Master.csv';
+
+    const SUB_SPECIES_MAP = {
+        '動物': ['咕咕鵝', '長鼻豬', '短毛兔', '短角牛', '絨絨羊', '矮腳雞', '嘎嘎鴨'],
+        '食材': ['白蘿蔔', '西瓜&84西瓜', '南瓜', '柿子', '桃樹&黃桃', '草莓', '番茄', '鳳梨'],
+        '花': ['風信子', '牽牛花', '碧綠常勝松', '薔薇', '繡球花']
+    };
 
     window.initializeSpecies = async function() {
         elements = {
@@ -37,27 +42,23 @@
         };
         
         setupEventListeners();
+        await loadFolderHandle();
+        await syncData(isOffline); 
+        updateSubFilter();
+        renderTable();
 
         if (isOffline) {
-            // OFFLINE MODE: Load folder and enable full features
-            await loadFolderHandle();
-            await syncData(true); // Priority: Local
             elements.adminToggle.style.display = 'block';
         } else {
-            // ONLINE MODE: Read-only from GitHub
-            await syncData(false); // Priority: Online
             elements.adminToggle.style.display = 'none';
             elements.adminPanel.style.display = 'flex';
             elements.adminPanel.innerHTML = `
                 <span style="font-weight:bold; color:var(--accent-orange); margin-right: 10px; display: flex; align-items: center; gap: 8px;">
-                    <i class="fas fa-globe"></i> 線上資料庫
+                    <i class="fas fa-globe"></i> 線上資料庫 (唯讀)
                 </span>
                 <button onclick="window.exportSpeciesCSV()" class="admin-btn secondary"><i class="fas fa-file-export"></i> 匯出 CSV</button>
             `;
         }
-        
-        updateSubFilter();
-        renderTable();
     };
 
     function setupEventListeners() {
@@ -67,7 +68,7 @@
         elements.levelFilter.oninput = applyFilters;
         elements.search.oninput = applyFilters;
 
-        if (isOffline) {
+        if (elements.adminToggle) {
             elements.adminToggle.onclick = () => {
                 if (!isAdmin) {
                     const pass = prompt("管理員密碼：");
@@ -86,17 +87,17 @@
                     renderTable();
                 }
             };
-            elements.modalMain.onchange = () => updateModalSub();
-            elements.form.onsubmit = handleFormSubmit;
         }
+        
+        if (elements.modalMain) elements.modalMain.onchange = () => updateModalSub();
+        if (elements.form) elements.form.onsubmit = handleFormSubmit;
     }
 
     async function loadFolderHandle() {
         try {
-            const db = await new Promise((resolve, reject) => {
+            const db = await new Promise((resolve) => {
                 const req = indexedDB.open('LifeAfter_Market_FS', 1);
                 req.onsuccess = () => resolve(req.result);
-                req.onerror = () => reject(req.error);
             });
             const tx = db.transaction('handles', 'readonly');
             const req = tx.objectStore('handles').get('dir_handle');
@@ -105,24 +106,23 @@
     }
 
     async function syncData(preferLocal) {
+        if (!elements.statusMsg) return;
         elements.statusMsg.innerHTML = '<i class="fas fa-sync fa-spin"></i> 同步中...';
         
         if (!preferLocal) {
-            // Try GitHub for Online Mode
             try {
                 const response = await fetch(ONLINE_URL, { cache: 'no-cache' });
                 if (response.ok) {
                     let text = await response.text();
                     if (text.startsWith('\ufeff')) text = text.slice(1);
                     speciesData = parseCSV(text);
-                    elements.statusMsg.innerHTML = '<i class="fas fa-globe" style="color:#4cd137"></i> 線上資料庫 (唯讀)';
+                    elements.statusMsg.innerHTML = '<i class="fas fa-globe" style="color:#4cd137"></i> 線上資料庫 (同步成功)';
                     applyFilters();
                     return;
                 }
             } catch (e) { }
         }
 
-        // Try Local for Offline Mode or Fallback
         if (dirHandle) {
             try {
                 const dataFolder = await dirHandle.getDirectoryHandle(DATA_FOLDER, { create: true });
@@ -136,37 +136,58 @@
             } catch (e) { 
                 elements.statusMsg.innerHTML = '載入本地失敗'; 
             }
-        } else if (!preferLocal) {
-            elements.statusMsg.innerHTML = '無法讀取線上資料';
         }
     }
 
+    // Robust CSV Parser
     function parseCSV(text) {
         if (!text || text.trim() === "") return [];
-        const lines = text.trim().split(/\r?\n/);
-        if (lines.length < 1) return [];
-        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-        return lines.slice(1).map((line, idx) => {
-            const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(',');
-            const obj = { id: idx };
-            headers.forEach((h, i) => {
-                let val = values[i] ? values[i].trim() : '';
+        const result = [];
+        const rows = text.trim().split(/\r?\n/);
+        if (rows.length < 1) return [];
+        
+        // Extract headers
+        const headers = splitCSVRow(rows[0]).map(h => h.replace(/^"|"$/g, '').trim());
+        
+        for (let i = 1; i < rows.length; i++) {
+            const values = splitCSVRow(rows[i]);
+            if (values.length < 2) continue; // Skip empty rows
+            const obj = { id: Date.now() + Math.random() + i };
+            headers.forEach((h, idx) => {
+                let val = values[idx] || '';
                 if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1).replace(/""/g, '"');
-                obj[h] = val;
+                obj[h] = val.trim();
             });
-            return obj;
-        });
+            result.push(obj);
+        }
+        return result;
+    }
+
+    function splitCSVRow(row) {
+        const result = [];
+        let start = 0;
+        let inQuotes = false;
+        for (let i = 0; i < row.length; i++) {
+            if (row[i] === '"') inQuotes = !inQuotes;
+            if (row[i] === ',' && !inQuotes) {
+                result.push(row.substring(start, i));
+                start = i + 1;
+            }
+        }
+        result.push(row.substring(start));
+        return result;
     }
 
     function updateSubFilter() {
-        const SUB_SPECIES_MAP = {
-            '動物': ['咕咕鵝', '長鼻豬', '短毛兔', '短角牛', '絨絨羊', '矮腳雞', '嘎嘎鴨'],
-            '食材': ['白蘿蔔', '西瓜&84西瓜', '南瓜', '柿子', '桃樹&黃桃', '草莓', '番茄', '鳳梨'],
-            '花': ['風信子', '牽牛花', '碧綠常勝松', '薔薇', '繡球花']
-        };
         const main = elements.mainFilter.value;
         const subs = main ? SUB_SPECIES_MAP[main] : [];
         elements.subFilter.innerHTML = '<option value="">全部次物種</option>' + subs.map(s => `<option value="${s}">${s}</option>`).join('');
+    }
+
+    function updateModalSub() {
+        const main = elements.modalMain.value;
+        const subs = SUB_SPECIES_MAP[main] || [];
+        elements.modalSub.innerHTML = subs.map(s => `<option value="${s}">${s}</option>`).join('');
     }
 
     function applyFilters() {
@@ -190,6 +211,8 @@
         filteredData.forEach(item => {
             const tr = document.createElement('tr');
             const mainClass = item['主物種'] === '動物' ? 'tag-animal' : (item['主物種'] === '食材' ? 'tag-food' : 'tag-flower');
+            const breedName = (item['品種'] || '').replace(/'/g, "\\'");
+
             tr.innerHTML = `
                 <td><span class="tag ${mainClass}">${item['主物種']}</span></td>
                 <td>${item['次物種']}</td>
@@ -197,13 +220,12 @@
                 <td>LV.${item['地圖等級']}</td>
                 <td>${item['地圖名稱']}</td>
                 <td style="font-size:0.8rem; color:#aaa;">${item['備註'] || '-'}</td>
-                ${isAdmin && isOffline ? `<td><button onclick="window.editSpeciesEntry('${item['品種']}')" class="admin-mini-btn"><i class="fas fa-edit"></i> 修改</button></td>` : '<td></td>'}
+                ${isAdmin && isOffline ? `<td><button onclick="window.editSpeciesEntry('${breedName}')" class="admin-mini-btn"><i class="fas fa-edit"></i> 修改</button></td>` : '<td></td>'}
             `;
             elements.tableBody.appendChild(tr);
         });
     }
 
-    // --- Admin Tools (Only active in Offline Mode) ---
     window.addSpeciesLocationRow = function(lv = '', map = '') {
         const div = document.createElement('div');
         div.style.cssText = 'display:grid; grid-template-columns: 80px 1fr 40px; gap:10px; margin-bottom:10px;';
@@ -217,12 +239,13 @@
 
     window.addSpeciesEntry = function() {
         currentEditingBreed = null;
-        elements.form.reset();
+        if (elements.form) elements.form.reset();
         elements.locationContainer.innerHTML = '';
         window.addSpeciesLocationRow();
-        document.getElementById('species-modal-title').textContent = '新增物種紀錄';
+        const title = document.getElementById('species-modal-title');
+        if (title) title.textContent = '新增物種紀錄';
         updateModalSub();
-        elements.modal.style.display = 'flex';
+        if (elements.modal) elements.modal.style.display = 'flex';
     };
 
     window.editSpeciesEntry = function(breed) {
@@ -230,15 +253,19 @@
         if (items.length === 0) return;
         currentEditingBreed = breed;
         elements.locationContainer.innerHTML = '';
+        
         const first = items[0];
         elements.modalMain.value = first['主物種'];
         updateModalSub();
         elements.modalSub.value = first['次物種'];
         elements.modalBreed.value = first['品種'];
         elements.modalNote.value = first['備註'];
+        
         items.forEach(item => window.addSpeciesLocationRow(item['地圖等級'], item['地圖名稱']));
-        document.getElementById('species-modal-title').textContent = '修改物種紀錄';
-        elements.modal.style.display = 'flex';
+        
+        const title = document.getElementById('species-modal-title');
+        if (title) title.textContent = '修改物種紀錄';
+        if (elements.modal) elements.modal.style.display = 'flex';
     };
 
     async function handleFormSubmit(e) {
@@ -249,50 +276,58 @@
         const note = elements.modalNote.value.trim();
         const locRows = elements.locationContainer.querySelectorAll('div');
         const newEntries = [];
+        
         locRows.forEach(row => {
-            newEntries.push({
-                id: Date.now() + Math.random(),
-                '主物種': main, '次物種': sub, '品種': breed,
-                '地圖等級': row.querySelector('.loc-level').value,
-                '地圖名稱': row.querySelector('.loc-map').value.trim(),
-                '備註': note
-            });
+            const lv = row.querySelector('.loc-level').value;
+            const map = row.querySelector('.loc-map').value.trim();
+            if (lv && map) {
+                newEntries.push({
+                    id: Date.now() + Math.random(),
+                    '主物種': main, '次物種': sub, '品種': breed,
+                    '地圖等級': lv, '地圖名稱': map, '備註': note
+                });
+            }
         });
-        if (currentEditingBreed) speciesData = speciesData.filter(i => i['品種'] !== currentEditingBreed);
+
+        if (currentEditingBreed) {
+            speciesData = speciesData.filter(i => i['品種'] !== currentEditingBreed);
+        }
+        
         speciesData.push(...newEntries);
         await saveToCSV();
-        elements.modal.style.display = 'none';
+        if (elements.modal) elements.modal.style.display = 'none';
         applyFilters();
     }
 
     async function saveToCSV() {
         if (!dirHandle) return;
         const headers = ['主物種', '次物種', '品種', '地圖等級', '地圖名稱', '備註'];
-        const csvContent = headers.join(',') + '\n' + 
-            speciesData.map(item => headers.map(h => `"${(item[h] || '').toString().replace(/"/g, '""')}"`).join(',')).join('\n');
+        const csvRows = [headers.join(',')];
+        speciesData.forEach(item => {
+            const row = headers.map(h => `"${(item[h] || '').toString().replace(/"/g, '""')}"`).join(',');
+            csvRows.push(row);
+        });
+        const csvContent = csvRows.join('\n');
         
         try {
-            const encoder = new TextEncoder();
-            const contentArray = encoder.encode(csvContent);
-            const bomArray = new Uint8Array([0xEF, 0xBB, 0xBF]);
-            const finalArray = new Uint8Array(bomArray.length + contentArray.length);
-            finalArray.set(bomArray);
-            finalArray.set(contentArray, bomArray.length);
+            // Using Blob for memory safety and correct encoding
+            const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+            const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8' });
 
             const dataFolder = await dirHandle.getDirectoryHandle(DATA_FOLDER, { create: true });
             const masterHandle = await dataFolder.getFileHandle(MASTER_FILE, { create: true });
             const writable = await masterHandle.createWritable();
-            await writable.write(finalArray);
+            await writable.write(blob);
             await writable.close();
 
             const backupFolder = await dataFolder.getDirectoryHandle(BACKUP_FOLDER, { create: true });
             const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
             const backupHandle = await backupFolder.getFileHandle(`Species_Backup_${dateStr}.csv`, { create: true });
             const backupWritable = await backupHandle.createWritable();
-            await backupWritable.write(finalArray);
+            await backupWritable.write(blob);
             await backupWritable.close();
             
-            elements.statusMsg.innerHTML = '<i class="fas fa-save"></i> 存檔與備份成功';
+            elements.statusMsg.innerHTML = '<i class="fas fa-save"></i> 存檔成功';
         } catch (e) { alert("存檔失敗"); }
     }
 
@@ -305,8 +340,12 @@
 
     window.exportSpeciesCSV = function() {
         const headers = ['主物種', '次物種', '品種', '地圖等級', '地圖名稱', '備註'];
-        const csv = headers.join(',') + '\n' + speciesData.map(item => headers.map(h => `"${(item[h] || '').replace(/"/g, '""')}"`).join(',')).join('\n');
-        const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+        const csvRows = [headers.join(',')];
+        speciesData.forEach(item => {
+            const row = headers.map(h => `"${(item[h] || '').toString().replace(/"/g, '""')}"`).join(',');
+            csvRows.push(row);
+        });
+        const blob = new Blob(["\ufeff" + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
         link.download = `Species_Master.csv`;
@@ -328,7 +367,7 @@
                     speciesData = newData;
                     await saveToCSV();
                     applyFilters();
-                    alert("匯入成功！");
+                    alert(`匯入完成，共 ${newData.length} 筆資料。`);
                 }
             };
             reader.readAsText(file);
