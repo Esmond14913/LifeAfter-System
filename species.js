@@ -10,6 +10,7 @@
     const BACKUP_FOLDER = 'backups';
     const MASTER_FILE = 'Species_Master.csv';
     const ADMIN_PASSWORD = '1491';
+    const ONLINE_URL = 'https://raw.githubusercontent.com/Esmond14913/LifeAfter-System/main/data/Species_Master.csv';
 
     const SUB_SPECIES_MAP = {
         '動物': ['咕咕鵝', '長鼻豬', '短毛兔', '短角牛', '絨絨羊', '矮腳雞', '嘎嘎鴨'],
@@ -37,7 +38,7 @@
         };
         setupEventListeners();
         await loadFolderHandle();
-        if (dirHandle) await syncData();
+        await syncData(); // Always try to sync (online first)
         updateSubFilter();
         renderTable();
     };
@@ -85,34 +86,61 @@
 
     async function getDataFolder() {
         if (!dirHandle) return null;
-        return await dirHandle.getDirectoryHandle(DATA_FOLDER, { create: true });
+        try {
+            return await dirHandle.getDirectoryHandle(DATA_FOLDER, { create: true });
+        } catch(e) { return null; }
     }
 
     async function getBackupFolder() {
         const dataFolder = await getDataFolder();
         if (!dataFolder) return null;
-        return await dataFolder.getDirectoryHandle(BACKUP_FOLDER, { create: true });
+        try {
+            return await dataFolder.getDirectoryHandle(BACKUP_FOLDER, { create: true });
+        } catch(e) { return null; }
     }
 
     async function syncData() {
-        if (!dirHandle) return;
-        elements.statusMsg.innerHTML = '同步中...';
+        elements.statusMsg.innerHTML = '<i class="fas fa-sync fa-spin"></i> 正在從 GitHub 同步...';
+        
+        // 1. Try Online First
+        try {
+            const response = await fetch(ONLINE_URL, { cache: 'no-cache' });
+            if (response.ok) {
+                let text = await response.text();
+                if (text.startsWith('\ufeff')) text = text.slice(1);
+                speciesData = parseCSV(text);
+                elements.statusMsg.innerHTML = '<i class="fas fa-globe" style="color:#4cd137"></i> 線上資料庫已同步';
+                applyFilters();
+                return;
+            }
+        } catch (e) {
+            console.warn('GitHub sync failed, falling back to local.');
+        }
+
+        // 2. Fallback to Local Folder
+        if (!dirHandle) {
+            elements.statusMsg.innerHTML = '<i class="fas fa-wifi-slash"></i> 離線中且未連結本地目錄';
+            return;
+        }
+
         try {
             const dataFolder = await getDataFolder();
+            if (!dataFolder) throw new Error("No data folder");
             const fileHandle = await dataFolder.getFileHandle(MASTER_FILE, { create: true });
             const file = await fileHandle.getFile();
             let text = await file.text();
             if (text.startsWith('\ufeff')) text = text.slice(1);
             speciesData = parseCSV(text);
-            elements.statusMsg.innerHTML = '<i class="fas fa-check"></i> 資料已載入 (data/ 資料夾)';
+            elements.statusMsg.innerHTML = '<i class="fas fa-hdd" style="color:#f39c12"></i> 已載入本地資料 (離線模式)';
             applyFilters();
         } catch (e) { 
             console.error(e);
-            elements.statusMsg.innerHTML = '讀取失敗'; 
+            elements.statusMsg.innerHTML = '<i class="fas fa-times-circle"></i> 資料載入失敗'; 
         }
     }
 
     function parseCSV(text) {
+        if (!text || text.trim() === "") return [];
         const lines = text.trim().split(/\r?\n/);
         if (lines.length < 1) return [];
         const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
@@ -252,6 +280,7 @@
 
             // Save to data/ folder
             const dataFolder = await getDataFolder();
+            if (!dataFolder) throw new Error("No data folder");
             const masterHandle = await dataFolder.getFileHandle(MASTER_FILE, { create: true });
             const writable = await masterHandle.createWritable();
             await writable.write(finalArray);
@@ -259,16 +288,18 @@
 
             // Save to data/backups/ folder
             const backupFolder = await getBackupFolder();
-            const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
-            const backupHandle = await backupFolder.getFileHandle(`Species_Backup_${dateStr}.csv`, { create: true });
-            const backupWritable = await backupHandle.createWritable();
-            await backupWritable.write(finalArray);
-            await backupWritable.close();
+            if (backupFolder) {
+                const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
+                const backupHandle = await backupFolder.getFileHandle(`Species_Backup_${dateStr}.csv`, { create: true });
+                const backupWritable = await backupHandle.createWritable();
+                await backupWritable.write(finalArray);
+                await backupWritable.close();
+            }
             
             elements.statusMsg.innerHTML = '<i class="fas fa-save"></i> 存檔與備份成功 (data/)';
         } catch (e) { 
             console.error(e);
-            alert("存檔失敗"); 
+            alert("存檔失敗：請確保已授權本地資料夾存取權限。"); 
         }
     }
 
@@ -278,7 +309,32 @@
         const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = `Species_Notes.csv`;
+        link.download = `Species_Master.csv`;
         link.click();
+    };
+
+    window.importSpeciesCSV = function() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.csv';
+        input.onchange = e => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = async event => {
+                let text = event.target.result;
+                if (text.startsWith('\ufeff')) text = text.slice(1);
+                const newData = parseCSV(text);
+                if (newData.length > 0) {
+                    speciesData = newData;
+                    await saveToCSV();
+                    applyFilters();
+                    alert("CSV 匯入成功！");
+                } else {
+                    alert("匯入失敗：CSV 格式不正確或檔案為空。");
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
     };
 })();
