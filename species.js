@@ -1,8 +1,20 @@
 (function() {
     let speciesData = [];
     let filteredData = [];
+    let isAdmin = false;
+    let dirHandle = null;
+    let currentEditingBreed = null;
     let elements = {};
 
+    // Environment Detection
+    const isOffline = window.location.protocol === 'file:' || 
+                      window.location.hostname === 'localhost' || 
+                      window.location.hostname === '127.0.0.1';
+
+    const DATA_FOLDER = 'data';
+    const BACKUP_FOLDER = 'backups';
+    const MASTER_FILE = 'Species_Master.csv';
+    const ADMIN_PASSWORD = '1491';
     const ONLINE_URL = 'https://raw.githubusercontent.com/Esmond14913/LifeAfter-System/main/data/Species_Master.csv';
 
     window.initializeSpecies = async function() {
@@ -14,26 +26,38 @@
             search: document.getElementById('species-search'),
             statusMsg: document.getElementById('species-sync-status'),
             adminToggle: document.getElementById('species-admin-toggle'),
-            adminPanel: document.getElementById('species-admin-panel')
+            adminPanel: document.getElementById('species-admin-panel'),
+            modal: document.getElementById('species-modal-overlay'),
+            form: document.getElementById('species-form'),
+            modalMain: document.getElementById('modal-species-main'),
+            modalSub: document.getElementById('modal-species-sub'),
+            modalBreed: document.getElementById('modal-species-breed'),
+            modalNote: document.getElementById('modal-species-note'),
+            locationContainer: document.getElementById('modal-location-container')
         };
         
         setupEventListeners();
-        await syncData(); // Only fetch from GitHub
-        updateSubFilter();
-        renderTable();
 
-        // Online mode: Hide admin lock if not needed, or just show tools
-        if (elements.adminToggle) elements.adminToggle.style.display = 'none';
-        if (elements.adminPanel) {
-            elements.adminPanel.style.display = 'flex'; // Always show tools like Export
-            // Clean up admin panel to only show useful online tools
+        if (isOffline) {
+            // OFFLINE MODE: Load folder and enable full features
+            await loadFolderHandle();
+            await syncData(true); // Priority: Local
+            elements.adminToggle.style.display = 'block';
+        } else {
+            // ONLINE MODE: Read-only from GitHub
+            await syncData(false); // Priority: Online
+            elements.adminToggle.style.display = 'none';
+            elements.adminPanel.style.display = 'flex';
             elements.adminPanel.innerHTML = `
                 <span style="font-weight:bold; color:var(--accent-orange); margin-right: 10px; display: flex; align-items: center; gap: 8px;">
-                    <i class="fas fa-database"></i> 線上資料庫
+                    <i class="fas fa-globe"></i> 線上資料庫
                 </span>
                 <button onclick="window.exportSpeciesCSV()" class="admin-btn secondary"><i class="fas fa-file-export"></i> 匯出 CSV</button>
             `;
         }
+        
+        updateSubFilter();
+        renderTable();
     };
 
     function setupEventListeners() {
@@ -42,23 +66,78 @@
         elements.subFilter.onchange = applyFilters;
         elements.levelFilter.oninput = applyFilters;
         elements.search.oninput = applyFilters;
+
+        if (isOffline) {
+            elements.adminToggle.onclick = () => {
+                if (!isAdmin) {
+                    const pass = prompt("管理員密碼：");
+                    if (pass === ADMIN_PASSWORD) {
+                        isAdmin = true;
+                        elements.adminToggle.classList.add('unlocked');
+                        elements.adminToggle.innerHTML = '<i class="fas fa-unlock"></i>';
+                        elements.adminPanel.style.display = 'flex';
+                        renderTable();
+                    }
+                } else {
+                    isAdmin = false;
+                    elements.adminToggle.classList.remove('unlocked');
+                    elements.adminToggle.innerHTML = '<i class="fas fa-lock"></i>';
+                    elements.adminPanel.style.display = 'none';
+                    renderTable();
+                }
+            };
+            elements.modalMain.onchange = () => updateModalSub();
+            elements.form.onsubmit = handleFormSubmit;
+        }
     }
 
-    async function syncData() {
-        elements.statusMsg.innerHTML = '<i class="fas fa-sync fa-spin"></i> 正在從 GitHub 同步...';
+    async function loadFolderHandle() {
         try {
-            const response = await fetch(ONLINE_URL, { cache: 'no-cache' });
-            if (response.ok) {
-                let text = await response.text();
+            const db = await new Promise((resolve, reject) => {
+                const req = indexedDB.open('LifeAfter_Market_FS', 1);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+            const tx = db.transaction('handles', 'readonly');
+            const req = tx.objectStore('handles').get('dir_handle');
+            dirHandle = await new Promise(resolve => req.onsuccess = () => resolve(req.result));
+        } catch (e) { }
+    }
+
+    async function syncData(preferLocal) {
+        elements.statusMsg.innerHTML = '<i class="fas fa-sync fa-spin"></i> 同步中...';
+        
+        if (!preferLocal) {
+            // Try GitHub for Online Mode
+            try {
+                const response = await fetch(ONLINE_URL, { cache: 'no-cache' });
+                if (response.ok) {
+                    let text = await response.text();
+                    if (text.startsWith('\ufeff')) text = text.slice(1);
+                    speciesData = parseCSV(text);
+                    elements.statusMsg.innerHTML = '<i class="fas fa-globe" style="color:#4cd137"></i> 線上資料庫 (唯讀)';
+                    applyFilters();
+                    return;
+                }
+            } catch (e) { }
+        }
+
+        // Try Local for Offline Mode or Fallback
+        if (dirHandle) {
+            try {
+                const dataFolder = await dirHandle.getDirectoryHandle(DATA_FOLDER, { create: true });
+                const fileHandle = await dataFolder.getFileHandle(MASTER_FILE, { create: true });
+                const file = await fileHandle.getFile();
+                let text = await file.text();
                 if (text.startsWith('\ufeff')) text = text.slice(1);
                 speciesData = parseCSV(text);
-                elements.statusMsg.innerHTML = '<i class="fas fa-globe" style="color:#4cd137"></i> 線上資料庫已同步';
+                elements.statusMsg.innerHTML = '<i class="fas fa-hdd" style="color:#f39c12"></i> 離線作業模式';
                 applyFilters();
-            } else {
-                throw new Error("Fetch failed");
+            } catch (e) { 
+                elements.statusMsg.innerHTML = '載入本地失敗'; 
             }
-        } catch (e) {
-            elements.statusMsg.innerHTML = '<i class="fas fa-times-circle"></i> 無法連接線上資料庫';
+        } else if (!preferLocal) {
+            elements.statusMsg.innerHTML = '無法讀取線上資料';
         }
     }
 
@@ -118,11 +197,111 @@
                 <td>LV.${item['地圖等級']}</td>
                 <td>${item['地圖名稱']}</td>
                 <td style="font-size:0.8rem; color:#aaa;">${item['備註'] || '-'}</td>
-                <td></td>
+                ${isAdmin && isOffline ? `<td><button onclick="window.editSpeciesEntry('${item['品種']}')" class="admin-mini-btn"><i class="fas fa-edit"></i> 修改</button></td>` : '<td></td>'}
             `;
             elements.tableBody.appendChild(tr);
         });
     }
+
+    // --- Admin Tools (Only active in Offline Mode) ---
+    window.addSpeciesLocationRow = function(lv = '', map = '') {
+        const div = document.createElement('div');
+        div.style.cssText = 'display:grid; grid-template-columns: 80px 1fr 40px; gap:10px; margin-bottom:10px;';
+        div.innerHTML = `
+            <input type="number" class="loc-level" placeholder="等級" value="${lv}" required style="padding:8px; background:#000; border:1px solid #444; border-radius:6px; color:white;">
+            <input type="text" class="loc-map" placeholder="地圖名稱" value="${map}" required style="padding:8px; background:#000; border:1px solid #444; border-radius:6px; color:white;">
+            <button type="button" onclick="this.parentElement.remove()" style="background:#444; border:none; color:#ff7675; border-radius:6px; cursor:pointer;"><i class="fas fa-trash"></i></button>
+        `;
+        elements.locationContainer.appendChild(div);
+    };
+
+    window.addSpeciesEntry = function() {
+        currentEditingBreed = null;
+        elements.form.reset();
+        elements.locationContainer.innerHTML = '';
+        window.addSpeciesLocationRow();
+        document.getElementById('species-modal-title').textContent = '新增物種紀錄';
+        updateModalSub();
+        elements.modal.style.display = 'flex';
+    };
+
+    window.editSpeciesEntry = function(breed) {
+        const items = speciesData.filter(i => i['品種'] === breed);
+        if (items.length === 0) return;
+        currentEditingBreed = breed;
+        elements.locationContainer.innerHTML = '';
+        const first = items[0];
+        elements.modalMain.value = first['主物種'];
+        updateModalSub();
+        elements.modalSub.value = first['次物種'];
+        elements.modalBreed.value = first['品種'];
+        elements.modalNote.value = first['備註'];
+        items.forEach(item => window.addSpeciesLocationRow(item['地圖等級'], item['地圖名稱']));
+        document.getElementById('species-modal-title').textContent = '修改物種紀錄';
+        elements.modal.style.display = 'flex';
+    };
+
+    async function handleFormSubmit(e) {
+        e.preventDefault();
+        const main = elements.modalMain.value;
+        const sub = elements.modalSub.value;
+        const breed = elements.modalBreed.value.trim();
+        const note = elements.modalNote.value.trim();
+        const locRows = elements.locationContainer.querySelectorAll('div');
+        const newEntries = [];
+        locRows.forEach(row => {
+            newEntries.push({
+                id: Date.now() + Math.random(),
+                '主物種': main, '次物種': sub, '品種': breed,
+                '地圖等級': row.querySelector('.loc-level').value,
+                '地圖名稱': row.querySelector('.loc-map').value.trim(),
+                '備註': note
+            });
+        });
+        if (currentEditingBreed) speciesData = speciesData.filter(i => i['品種'] !== currentEditingBreed);
+        speciesData.push(...newEntries);
+        await saveToCSV();
+        elements.modal.style.display = 'none';
+        applyFilters();
+    }
+
+    async function saveToCSV() {
+        if (!dirHandle) return;
+        const headers = ['主物種', '次物種', '品種', '地圖等級', '地圖名稱', '備註'];
+        const csvContent = headers.join(',') + '\n' + 
+            speciesData.map(item => headers.map(h => `"${(item[h] || '').toString().replace(/"/g, '""')}"`).join(',')).join('\n');
+        
+        try {
+            const encoder = new TextEncoder();
+            const contentArray = encoder.encode(csvContent);
+            const bomArray = new Uint8Array([0xEF, 0xBB, 0xBF]);
+            const finalArray = new Uint8Array(bomArray.length + contentArray.length);
+            finalArray.set(bomArray);
+            finalArray.set(contentArray, bomArray.length);
+
+            const dataFolder = await dirHandle.getDirectoryHandle(DATA_FOLDER, { create: true });
+            const masterHandle = await dataFolder.getFileHandle(MASTER_FILE, { create: true });
+            const writable = await masterHandle.createWritable();
+            await writable.write(finalArray);
+            await writable.close();
+
+            const backupFolder = await dataFolder.getDirectoryHandle(BACKUP_FOLDER, { create: true });
+            const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
+            const backupHandle = await backupFolder.getFileHandle(`Species_Backup_${dateStr}.csv`, { create: true });
+            const backupWritable = await backupHandle.createWritable();
+            await backupWritable.write(finalArray);
+            await backupWritable.close();
+            
+            elements.statusMsg.innerHTML = '<i class="fas fa-save"></i> 存檔與備份成功';
+        } catch (e) { alert("存檔失敗"); }
+    }
+
+    window.clearAllSpecies = async function() {
+        if (!confirm("確定要清空嗎？")) return;
+        speciesData = [];
+        await saveToCSV();
+        applyFilters();
+    };
 
     window.exportSpeciesCSV = function() {
         const headers = ['主物種', '次物種', '品種', '地圖等級', '地圖名稱', '備註'];
@@ -132,5 +311,28 @@
         link.href = URL.createObjectURL(blob);
         link.download = `Species_Master.csv`;
         link.click();
+    };
+
+    window.importSpeciesCSV = function() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.csv';
+        input.onchange = e => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = async event => {
+                let text = event.target.result;
+                if (text.startsWith('\ufeff')) text = text.slice(1);
+                const newData = parseCSV(text);
+                if (newData.length > 0) {
+                    speciesData = newData;
+                    await saveToCSV();
+                    applyFilters();
+                    alert("匯入成功！");
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
     };
 })();
