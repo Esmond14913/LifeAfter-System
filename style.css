@@ -140,6 +140,23 @@ body.dark-theme {
     border-left-color: var(--accent-orange);
 }
 
+.nav-section {
+    padding: 25px 20px 10px 20px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #444;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: opacity 0.2s;
+}
+
+.sidebar.collapsed .nav-section {
+    opacity: 0;
+    pointer-events: none;
+}
+
 /* Footer */
 .sidebar-footer {
     padding: 20px;
