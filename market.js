@@ -219,12 +219,30 @@
         const query = (elements.search.value || '').toLowerCase();
         const mainCat = elements.categoryFilter.value;
         const subCat = elements.subCategoryFilter.value;
+        
         filteredData = marketData.filter(item => {
             const nameMatch = (item['品項'] || '').toLowerCase().includes(query);
             const mainMatch = mainCat === '' || item['母類別'] === mainCat;
             const subMatch = subCat === '' || item['子類別'] === subCat;
             return nameMatch && mainMatch && subMatch;
         });
+
+        // 多層級排序: 母類別 > 地圖等級 > 子類別
+        filteredData.sort((a, b) => {
+            // 1. 母類別
+            if (a['母類別'] !== b['母類別']) {
+                return a['母類別'].localeCompare(b['母類別'], 'zh-TW');
+            }
+            // 2. 地圖等級 (欄位名為 '等級')
+            const levelA = parseInt(a['等級']) || 0;
+            const levelB = parseInt(b['等級']) || 0;
+            if (levelA !== levelB) {
+                return levelA - levelB;
+            }
+            // 3. 子類別
+            return (a['子類別'] || '').localeCompare(b['子類別'] || '', 'zh-TW');
+        });
+
         renderTable();
     }
 
