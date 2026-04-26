@@ -329,3 +329,19 @@ body.dark-theme {
         padding: 20px;
     }
 }
+
+/* Select & Option Styling Fix */
+select {
+    background-color: #1a1c1e !important;
+    color: white !important;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+select option {
+    background-color: #1a1c1e !important;
+    color: white !important;
+    padding: 10px;
+}

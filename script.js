@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <span class="stat-label">資料夾狀態</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-value">v2.0.1</span>
+                            <span class="stat-value">v2.0.5</span>
                             <span class="stat-label">當前版本</span>
                         </div>
                     </div>
