@@ -188,10 +188,31 @@
     function updateFilterOptions() {
         const mainCats = [...new Set(marketData.map(item => item['母類別']))].filter(Boolean).sort();
         const subCats = [...new Set(marketData.map(item => item['子類別']))].filter(Boolean).sort();
+        
+        // Update Search Filters
         elements.categoryFilter.innerHTML = '<option value="">全部母類別</option>' + 
             mainCats.map(c => `<option value="${c}">${c}</option>`).join('');
         elements.subCategoryFilter.innerHTML = '<option value="">全部子類別</option>' + 
             subCats.map(c => `<option value="${c}">${c}</option>`).join('');
+
+        // Update Modal Selects
+        elements.mainCatInput.innerHTML = mainCats.map(c => `<option value="${c}">${c}</option>`).join('');
+        updateModalSubOptions();
+    }
+
+    function updateModalSubOptions() {
+        const selectedMain = elements.mainCatInput.value;
+        const subCats = [...new Set(marketData
+            .filter(item => item['母類別'] === selectedMain)
+            .map(item => item['子類別'])
+        )].filter(Boolean).sort();
+        
+        elements.subCatInput.innerHTML = subCats.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+
+    // Add listener for modal main cat change
+    if (elements.mainCatInput) {
+        elements.mainCatInput.onchange = updateModalSubOptions;
     }
 
     function applyFilters() {
@@ -234,6 +255,7 @@
         currentEditingItem = marketData.find(i => i['品項'] === itemName);
         if (currentEditingItem) {
             elements.mainCatInput.value = currentEditingItem['母類別'];
+            updateModalSubOptions(); // Populate the sub-category list based on the main category
             elements.subCatInput.value = currentEditingItem['子類別'];
             elements.levelInput.value = currentEditingItem['等級'] || '';
             elements.itemNameInput.value = currentEditingItem['品項'];
