@@ -227,18 +227,35 @@
             return nameMatch && mainMatch && subMatch;
         });
 
-        // 多層級排序: 母類別 > 地圖等級 > 子類別
+        // 多層級排序: 母類別(權重) > 地圖等級 > 子類別
+        const categoryWeight = {
+            '基礎資源': 1,
+            '專屬資源': 2,
+            '一般半成品': 3,
+            '專屬半成品': 4,
+            '特殊材料': 5
+        };
+
         filteredData.sort((a, b) => {
-            // 1. 母類別
+            // 1. 母類別 (按權重排序，未知類別排在最後)
+            const weightA = categoryWeight[a['母類別']] || 99;
+            const weightB = categoryWeight[b['母類別']] || 99;
+            
+            if (weightA !== weightB) {
+                return weightA - weightB;
+            }
+            
             if (a['母類別'] !== b['母類別']) {
                 return a['母類別'].localeCompare(b['母類別'], 'zh-TW');
             }
+
             // 2. 地圖等級 (欄位名為 '等級')
             const levelA = parseInt(a['等級']) || 0;
             const levelB = parseInt(b['等級']) || 0;
             if (levelA !== levelB) {
                 return levelA - levelB;
             }
+
             // 3. 子類別
             return (a['子類別'] || '').localeCompare(b['子類別'] || '', 'zh-TW');
         });
