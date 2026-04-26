@@ -227,7 +227,15 @@
             return nameMatch && mainMatch && subMatch;
         });
 
-        // 多層級排序: 地圖等級(0-14, 空白在後) > 子類別 > 母類別
+        // 多層級排序: 地圖等級(0-14) > 母類別(權重) > 子類別
+        const categoryWeight = {
+            '基礎資源': 1,
+            '專屬資源': 2,
+            '一般半成品': 3,
+            '專屬半成品': 4,
+            '特殊材料': 5
+        };
+
         filteredData.sort((a, b) => {
             // 1. 地圖等級 (處理空白與數值)
             const getLevelVal = (val) => {
@@ -238,16 +246,20 @@
             const levelA = getLevelVal(a['等級']);
             const levelB = getLevelVal(b['等級']);
             
-            if (levelA !== levelB) {
-                return levelA - levelB;
+            if (levelA !== levelB) return levelA - levelB;
+
+            // 2. 母類別 (按權重)
+            const weightA = categoryWeight[a['母類別']] || 99;
+            const weightB = categoryWeight[b['母類別']] || 99;
+            
+            if (weightA !== weightB) return weightA - weightB;
+            
+            if (a['母類別'] !== b['母類別']) {
+                return a['母類別'].localeCompare(b['母類別'], 'zh-TW');
             }
 
-            // 2. 子類別
-            const subCompare = (a['子類別'] || '').localeCompare(b['子類別'] || '', 'zh-TW');
-            if (subCompare !== 0) return subCompare;
-
-            // 3. 母類別
-            return (a['母類別'] || '').localeCompare(b['母類別'] || '', 'zh-TW');
+            // 3. 子類別
+            return (a['子類別'] || '').localeCompare(b['子類別'] || '', 'zh-TW');
         });
 
         renderTable();
