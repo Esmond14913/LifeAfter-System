@@ -46,19 +46,21 @@
         elements.formName.oninput = renderPreviewTree;
         const closeBtn = document.getElementById('craft-modal-close-btn');
         if (closeBtn) closeBtn.onclick = () => document.getElementById('crafting-modal-overlay').style.display = 'none';
-        const cancelBtn = document.getElementById('craft-modal-cancel');
-        if (cancelBtn) cancelBtn.onclick = () => document.getElementById('crafting-modal-overlay').style.display = 'none';
-        const saveBtn = document.getElementById('craft-modal-save');
-        if (saveBtn) saveBtn.onclick = handleFormSubmit;
+        if (cancelBtn = document.getElementById('craft-modal-cancel')) cancelBtn.onclick = () => document.getElementById('crafting-modal-overlay').style.display = 'none';
+        if (saveBtn = document.getElementById('craft-modal-save')) saveBtn.onclick = handleFormSubmit;
     }
 
     async function loadDataFromExcel() {
         try {
-            const db = await openMarketDB();
-            const tx = db.transaction('handles', 'readonly');
-            const req = tx.objectStore('handles').get('dir_handle');
-            dirHandle = await new Promise(resolve => req.onsuccess = () => resolve(req.result));
+            // Use Global dirHandle if available, otherwise fallback to private
+            dirHandle = window.dirHandle || (await openMarketDB().then(db => {
+                const tx = db.transaction('handles', 'readonly');
+                const req = tx.objectStore('handles').get('dir_handle');
+                return new Promise(resolve => req.onsuccess = () => resolve(req.result));
+            }));
+
             if (dirHandle) {
+                if (!(await window.verifyPermission(dirHandle))) return;
                 const fileHandle = await dirHandle.getFileHandle(MASTER_FILE_XLSX);
                 const file = await fileHandle.getFile();
                 const buffer = await file.arrayBuffer();
@@ -117,7 +119,7 @@
     window.setSupplyMode = function(itemName, mode) {
         itemSupplyModes[itemName] = mode;
         renderCostTree();
-        renderPreviewTree(); // Sync with modal if open
+        renderPreviewTree();
         updateDashboard();
     };
 
@@ -128,11 +130,19 @@
         try {
             const rootNode = buildNodeUI(selectedTarget, 1, new Set(), 0);
             elements.costTree.appendChild(rootNode);
-        } catch (e) { elements.costTree.innerHTML = `<div style="padding:20px; color:#e74c3c;">運算過深。</div>`; }
+        } catch (e) { 
+            console.error(e);
+            elements.costTree.innerHTML = `<div style="padding:20px; color:#e74c3c;"><i class="fas fa-exclamation-triangle"></i> 偵測到循環引用或運算過深，已停止。</div>`; 
+        }
     }
 
     function buildNodeUI(itemName, qty, visited, depth) {
-        if (depth > 5) throw new Error("Too deep");
+        if (depth > 10) throw new Error("Too deep");
+        if (visited.has(itemName)) throw new Error("Circular dependency: " + itemName);
+        
+        const newVisited = new Set(visited);
+        newVisited.add(itemName);
+
         const container = document.createElement('div');
         container.className = 'tree-node-wrapper';
 
@@ -146,7 +156,7 @@
         
         let displayPrice = marketPrice * qty;
         if (mode === 'self') displayPrice = 0;
-        else if (mode === 'cost' && hasRecipe) displayPrice = calculateTotalCost(itemName, qty, depth);
+        else if (mode === 'cost' && hasRecipe) displayPrice = calculateTotalCost(itemName, qty, new Set(), 0);
 
         content.innerHTML = `
             <div class="node-main">
@@ -173,15 +183,16 @@
             const subContainer = document.createElement('div');
             subContainer.className = 'tree-node';
             recipe.materials.forEach(mat => {
-                subContainer.appendChild(buildNodeUI(mat.item, mat.qty * qty, new Set(visited), depth + 1));
+                subContainer.appendChild(buildNodeUI(mat.item, mat.qty * qty, newVisited, depth + 1));
             });
             container.appendChild(subContainer);
         }
         return container;
     }
 
-    function calculateTotalCost(itemName, qty, depth = 0) {
-        if (depth > 5) return getPrice(itemName) * qty;
+    function calculateTotalCost(itemName, qty, visited, depth = 0) {
+        if (depth > 10 || visited.has(itemName)) return getPrice(itemName) * qty;
+        
         const mode = getSupplyMode(itemName);
         if (mode === 'self') return 0;
         if (mode === 'market') return getPrice(itemName) * qty;
@@ -189,16 +200,19 @@
         const recipe = craftingDB[itemName];
         if (!recipe) return getPrice(itemName) * qty;
         
+        const newVisited = new Set(visited);
+        newVisited.add(itemName);
+
         let subCost = 0;
         recipe.materials.forEach(mat => {
-            subCost += calculateTotalCost(mat.item, mat.qty * qty, depth + 1);
+            subCost += calculateTotalCost(mat.item, mat.qty * qty, newVisited, depth + 1);
         });
         return subCost;
     }
 
     function updateDashboard() {
         if (!selectedTarget) return;
-        const totalCost = calculateTotalCost(selectedTarget, 1, 0);
+        const totalCost = calculateTotalCost(selectedTarget, 1, new Set(), 0);
         const sellPrice = parseFloat(elements.expectedPrice.value) || 0;
         const netProfit = (sellPrice * (1 - currentTaxRate)) - totalCost;
         const roi = totalCost > 0 ? (netProfit / totalCost) * 100 : 0;
@@ -246,7 +260,7 @@
         try {
             const root = buildNodeUI(tempName, 1, new Set(), 0);
             elements.previewTree.appendChild(root);
-        } catch (e) { elements.previewTree.innerHTML = '<div style="color:#e74c3c">預覽失敗。</div>'; }
+        } catch (e) { elements.previewTree.innerHTML = '<div style="color:#e74c3c">預覽失敗或偵測到循環引用。</div>'; }
         if (originalRecipe) craftingDB[tempName] = originalRecipe;
         else delete craftingDB[tempName];
     };
@@ -283,17 +297,14 @@
             XLSX.utils.book_append_sheet(workbook, marketSheet, "MarketData");
             XLSX.utils.book_append_sheet(workbook, recipeSheet, "CraftingRecipes");
             const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+            
             const masterHandle = await dirHandle.getFileHandle(MASTER_FILE_XLSX, { create: true });
             const writable = await masterHandle.createWritable();
             await writable.write(buffer);
             await writable.close();
-            const now = new Date();
-            const dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
-            const backupHandle = await dirHandle.getFileHandle(`Market_Master_${dateStr}.xlsx`, { create: true });
-            const backupWritable = await backupHandle.createWritable();
-            await backupWritable.write(buffer);
-            await backupWritable.close();
+            
             currentWorkbook = workbook;
+            alert("食譜儲存成功！");
         } catch (e) { alert("儲存失敗"); }
     }
 })();
