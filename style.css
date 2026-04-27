@@ -345,3 +345,8 @@ select option {
     color: white !important;
     padding: 10px;
 }
+
+/* Market Status Badges */
+.status-badge.status-low { background: rgba(46, 204, 113, 0.2) !important; color: #2ecc71 !important; border: 1px solid rgba(46, 204, 113, 0.3) !important; }
+.status-badge.status-mid { background: rgba(241, 196, 15, 0.2) !important; color: #f1c40f !important; border: 1px solid rgba(241, 196, 15, 0.3) !important; }
+.status-badge.status-high { background: rgba(231, 76, 60, 0.2) !important; color: #e74c3c !important; border: 1px solid rgba(231, 76, 60, 0.3) !important; }

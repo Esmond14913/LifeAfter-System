@@ -271,6 +271,22 @@
         filteredData.forEach(item => {
             const min = parseFloat(item['系統低價']) || 0;
             const current = parseFloat(item['現在市價']) || 0;
+            const max = Math.round(min * 3);
+            
+            let statusLabel = '低價';
+            let statusClass = 'status-low';
+            
+            if (max > min) {
+                const ratio = (current - min) / (max - min);
+                if (ratio > 0.66) {
+                    statusLabel = '高價';
+                    statusClass = 'status-high';
+                } else if (ratio > 0.33) {
+                    statusLabel = '中價';
+                    statusClass = 'status-mid';
+                }
+            }
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${item['母類別']}</td>
@@ -278,9 +294,9 @@
                 <td>${item['等級'] || '-'}</td>
                 <td style="font-weight:600; color:var(--accent-orange);">${item['品項']}</td>
                 <td class="price-tag">${min}</td>
-                <td class="price-tag">${Math.round(min*3)}</td>
+                <td class="price-tag">${max}</td>
                 <td class="price-tag price-normal">${current}</td>
-                <td><div class="status-badge status-fair">${current > min ? '中位' : '超值'}</div></td>
+                <td><div class="status-badge ${statusClass}">${statusLabel}</div></td>
                 <td class="update-time">${item['更新時間']}</td>
                 <td><button class="admin-mini-btn" onclick="window.editMarketItem('${item['品項']}')"><i class="fas fa-edit"></i> 修改</button></td>
             `;
